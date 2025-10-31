@@ -25,7 +25,7 @@ Pro lokální spuštění dokumentace je potřeba:
 
 ### Možnost 2 – Otevření přímo z disku
 1. Spusťte následující příkaz v kořenovém adresáři projektu:
-    python -m http.server 8000
+    python -m http.server 8080
 
 2. Poté otevřete v prohlížeči adresu:
-    http://localhost:8000  
+    http://localhost:8080  
