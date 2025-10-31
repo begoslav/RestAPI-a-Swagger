@@ -1,0 +1,256 @@
+openapi: 3.0.0
+info:
+  title: Akciový broker - Demo API
+  version: 1.0.0
+  description: Demo REST API pro školní projekt. In-memory implementace.
+servers:
+  - url: http://localhost:8080
+tags:
+  - name: Clients
+  - name: Orders
+  - name: Matches
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string }
+        message: { type: string }
+    ClientCreate:
+      type: object
+      required: [nickname]
+      properties:
+        nickname: { type: string }
+        address: { type: string }
+    AuthResponse:
+      type: object
+      properties:
+        client:
+          type: object
+        token:
+          type: string
+    OrderBase:
+      type: object
+      properties:
+        id: { type: string }
+        stock: { type: string }
+        amount: { type: integer }
+        clientId: { type: string }
+        createdAt: { type: string }
+        status: { type: string }
+        type: { type: string }
+    SellOrderCreate:
+      type: object
+      required: [stock, amount, address]
+      properties:
+        stock: { type: string }
+        amount: { type: integer }
+        address: { type: string }
+    BuyOrderCreate:
+      type: object
+      required: [stock, amount]
+      properties:
+        stock: { type: string }
+        amount: { type: integer }
+    Match:
+      type: object
+      properties:
+        id: { type: string }
+        sellOrderId: { type: string }
+        buyOrderId: { type: string }
+        sellerAddress: { type: string }
+        createdAt: { type: string }
+paths:
+  /clients:
+    post:
+      tags: [Clients]
+      summary: Register client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /orders/sell:
+    post:
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      summary: Create sell order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellOrderCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderBase'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+  /orders/buy:
+    post:
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      summary: Create buy order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuyOrderCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderBase'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+
+  /orders/sells:
+    get:
+      tags: [Orders]
+      summary: List sell orders
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: stock
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+
+  /orders/buys:
+    get:
+      tags: [Orders]
+      summary: List buy orders
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, default: 20 }
+        - in: query
+          name: stock
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+
+  /orders/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Orders]
+      summary: Get order detail
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not found
+    delete:
+      tags: [Orders]
+      security:
+        - bearerAuth: []
+      summary: Delete order
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not found
+
+  /simulate/match:
+    post:
+      tags: [Matches]
+      security:
+        - bearerAuth: []
+      summary: Simulate match
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sellOrderId, buyOrderId]
+              properties:
+                sellOrderId: { type: string }
+                buyOrderId: { type: string }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+        '400':
+          description: Validation error
+        '404':
+          description: Not found
+
+  /matches/{orderId}:
+    parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema: { type: string }
+    get:
+      tags: [Matches]
+      summary: Get matches for order
+      responses:
+        '200':
+          description: OK
+        '404':
+          description: Not found
