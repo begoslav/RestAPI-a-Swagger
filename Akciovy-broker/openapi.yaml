@@ -1,0 +1,465 @@
+openapi: 3.0.0
+info:
+  title: Akciový broker - Demo API
+  version: 1.0.0
+  description: >
+    Demo REST API pro předmět "Akciový broker" — matchmaking mezi klienty, kteří
+    chtějí prodat stock, a klienty, kteří chtějí koupit. Projekt je pouze
+    simulace: systém neprovádí reálné transakce, pouze páruje inzeráty.
+servers:
+  - url: http://localhost:8080
+    description: Lokální vývoj
+  - url: https://api.example.local
+    description: Staging/produkce (demo)
+tags:
+  - name: Clients
+    description: Registrace a správa klientů
+  - name: Orders
+    description: Sell / Buy inzeráty (orders)
+  - name: Matches
+    description: Párování inzerátů (simulace)
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Title is required
+    Client:
+      type: object
+      required: [id, nickname, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "c6a1f9b8-1a4a-4d7b-bf3b-1234567890ab"
+        nickname:
+          type: string
+          example: "tomas123"
+        address:
+          type: string
+          example: "Hlavní 12, 110 00 Praha"
+        createdAt:
+          type: string
+          format: date-time
+    ClientCreate:
+      type: object
+      required: [nickname]
+      properties:
+        nickname:
+          type: string
+          minLength: 2
+          example: "tomas123"
+        address:
+          type: string
+          example: "Hlavní 12, 110 00 Praha"
+    AuthResponse:
+      type: object
+      required: [client, token]
+      properties:
+        client:
+          $ref: '#/components/schemas/Client'
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+    OrderBase:
+      type: object
+      required: [id, stock, amount, clientId, createdAt, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        stock:
+          type: string
+          example: "ACME"
+        amount:
+          type: integer
+          minimum: 1
+          example: 10
+        clientId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [open, matched, closed]
+          example: open
+        type:
+          type: string
+          enum: [sell, buy]
+          example: sell
+    SellOrderCreate:
+      type: object
+      required: [stock, amount, address]
+      properties:
+        stock:
+          type: string
+          example: "ACME"
+        amount:
+          type: integer
+          minimum: 1
+          example: 5
+        address:
+          type: string
+          example: "Prodavačova 5, 130 00 Praha"
+    BuyOrderCreate:
+      type: object
+      required: [stock, amount]
+      properties:
+        stock:
+          type: string
+          example: "ACME"
+        amount:
+          type: integer
+          minimum: 1
+          example: 5
+    SellOrder:
+      allOf:
+        - $ref: '#/components/schemas/OrderBase'
+        - type: object
+          properties:
+            address:
+              type: string
+              example: "Prodavačova 5, 130 00 Praha"
+    BuyOrder:
+      allOf:
+        - $ref: '#/components/schemas/OrderBase'
+        - type: object
+          properties: {}
+    PagedOrders:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderBase'
+        total:
+          type: integer
+    Match:
+      type: object
+      required: [id, sellOrderId, buyOrderId, createdAt, sellerAddress]
+      properties:
+        id:
+          type: string
+          format: uuid
+        sellOrderId:
+          type: string
+          format: uuid
+        buyOrderId:
+          type: string
+          format: uuid
+        sellerAddress:
+          type: string
+          example: "Prodavačova 5, 130 00 Praha"
+        createdAt:
+          type: string
+          format: date-time
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Index stránky (1-based)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Počet položek na stránku
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    StockFilter:
+      name: stock
+      in: query
+      description: Filtrovat podle názvu akcie (přesná shoda)
+      schema:
+        type: string
+paths:
+  /clients:
+    post:
+      tags: [Clients]
+      summary: Registrace klienta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientCreate'
+            examples:
+              sample:
+                value:
+                  nickname: "tomas123"
+                  address: "Hlavní 12, Praha"
+      responses:
+        '201':
+          description: Created — vrací client objekt a token (simulace JWT)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/sell:
+    post:
+      tags: [Orders]
+      summary: Vytvořit sell inzerát (prodávající)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SellOrderCreate'
+            examples:
+              sample:
+                value:
+                  stock: "ACME"
+                  amount: 3
+                  address: "Prodavačova 5, Praha"
+      responses:
+        '201':
+          description: SellOrder vytvořen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SellOrder'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '409':
+          description: Conflict (např. duplicitní identifikátor)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/buy:
+    post:
+      tags: [Orders]
+      summary: Vytvořit buy inzerát (kupující)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BuyOrderCreate'
+            examples:
+              sample:
+                value:
+                  stock: "ACME"
+                  amount: 3
+      responses:
+        '201':
+          description: BuyOrder vytvořen
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuyOrder'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '409':
+          description: Conflict (např. duplicitní identifikátor)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/sells:
+    get:
+      tags: [Orders]
+      summary: Seznam sell inzerátů (filtrovatelný)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/StockFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedOrders'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/buys:
+    get:
+      tags: [Orders]
+      summary: Seznam buy inzerátů (filtrovatelný)
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/StockFilter'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedOrders'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /orders/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: ID inzerátu (sell nebo buy)
+    get:
+      tags: [Orders]
+      summary: Detail inzerátu
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderBase'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags: [Orders]
+      summary: Smazat inzerát (owner/admin)
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: No Content
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (nejste owner/admin)
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /simulate/match:
+    post:
+      tags: [Matches]
+      summary: Simulovat nalezení páru sell <-> buy (ADMIN)
+      description: |
+        Tento endpoint je pouze pro účely testování. Admin zadá sellOrderId a buyOrderId,
+        systém označí oba inzeráty jako matched a vrátí Match objekt včetně sellerAddress,
+        která by byla zaslána buyerovi v reálném systému.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sellOrderId, buyOrderId]
+              properties:
+                sellOrderId:
+                  type: string
+                  format: uuid
+                buyOrderId:
+                  type: string
+                  format: uuid
+            examples:
+              sample:
+                value:
+                  sellOrderId: "a1111111-1111-1111-1111-111111111111"
+                  buyOrderId:  "b2222222-2222-2222-2222-222222222222"
+      responses:
+        '201':
+          description: Match created (simulace notifikace)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Match'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Unauthorized
+        '404':
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /matches/{orderId}:
+    parameters:
+      - in: path
+        name: orderId
+        required: true
+        schema:
+          type: string
+          format: uuid
+        description: ID inzerátu pro hledání matchů
+    get:
+      tags: [Matches]
+      summary: Zjistit napárované protistrany pro daný inzerát
+      responses:
+        '200':
+          description: Seznam matchů
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Match'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+security:
+  - {}
